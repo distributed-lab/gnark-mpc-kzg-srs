@@ -18,21 +18,21 @@ The original Aztec setup ceremony can be found in the [AztecProtocol/ignition-ve
 A **trusted setup** is a cryptographic preprocessing step required in some zero-knowledge proof systems, such as **SNARKs**. The purpose of this setup is to generate structured randomness that allows for efficient proof verification. However, if the secret randomness (often called "toxic waste") is known by an attacker, they could create fraudulent proofs.
 
 ### Powers of Tau
-The **Powers of Tau** ceremony is a specific type of trusted setup designed to generate a structured reference string (SRS). This involves computing and publishing a sequence of powers of a secret value \( \tau \) (tau):
+The **Powers of Tau** ceremony is a specific type of trusted setup designed to generate a structured reference string (SRS). This involves computing and publishing a sequence of powers of a secret value $\tau$ (tau):
 
-\[
+```math
 1, \tau, \tau^2, \tau^3, \dots, \tau^n
-\]
+```
 
 These values are then used to construct polynomial commitments and efficient zero-knowledge proofs.
 
 In the case of KZG commitments, the SRS consists of elliptic curve elements computed from these powers:
 
-\[
+```math
 \{ g^{\tau^0}, g^{\tau^1}, g^{\tau^2}, \dots, g^{\tau^n} \}
-\]
+```
 
-where \( g \) is a generator of the elliptic curve group. This structured randomness allows efficient cryptographic operations while ensuring security.
+where $g$ is a generator of the elliptic curve group. This structured randomness allows efficient cryptographic operations while ensuring security.
 
 ## Installation
 
