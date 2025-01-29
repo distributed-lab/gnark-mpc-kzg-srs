@@ -46,6 +46,18 @@ go build -o aztec_to_gnark_srs
 ```
 
 ## Usage
+
+First of all you'll need to download the transcripts from the Aztec setup. You can find them in the 
+[AztecProtocol/ignition-verification](https://github.com/AztecProtocol/ignition-verification).
+
+At the time of writing, the transcripts are available by the following link:
+
+```bash
+curl https://aztec-ignition.s3.eu-west-2.amazonaws.com/MAIN+IGNITION/sealed/transcript<X>.dat -o transcript<X>.dat
+```
+
+Where `<X>` is a number from 0 to 19 -- 20 files in total.
+
 ```sh
 ./aztec_to_gnark_srs <transcripts_directory>
 ```
