@@ -85,7 +85,10 @@ Then:
 The original Aleo setup ceremony was generated using [AleoHQ/aleo-setup](https://github.com/AleoHQ/aleo-setup) repository.
 The links to download the transcripts can be found in the [ProvableHQ/snarkVM](https://github.com/ProvableHQ/snarkVM) repository.
 
-Especially, the $\{g^{\tau^n}\}_n$ for $n == 15$ can be found in the [resources directory](https://github.com/ProvableHQ/snarkVM/blob/82f1dbbf255a3b34d3732f395597a30276227966/parameters/src/mainnet/resources/powers-of-beta-15.usrs), as well as
+> [!TIP]
+> You may also find [this link](https://setup-staging.aleo.org/transcripts) useful, where all the rounds and participants' signatures are placed.
+
+Especially, the $`\{g^{\tau^i}\}^n_{i=0}`$ for $n = 15$ can be found in the [resources directory](https://github.com/ProvableHQ/snarkVM/blob/82f1dbbf255a3b34d3732f395597a30276227966/parameters/src/mainnet/resources/powers-of-beta-15.usrs), as well as
 $g2^{\tau}$ ([here](https://github.com/ProvableHQ/snarkVM/blob/82f1dbbf255a3b34d3732f395597a30276227966/parameters/src/mainnet/resources/beta-h.usrs)). 
 The metadata files for setup up to $n == 28$ can be found in the same directory, while the setup files themself can be 
 downloaded using [this code](https://github.com/ProvableHQ/snarkVM/blob/82f1dbbf255a3b34d3732f395597a30276227966/parameters/src/mainnet/mod.rs#L23-L43).
