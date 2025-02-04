@@ -3,3 +3,8 @@
 *.dev
 *.dev.*
 dev.*
+
+aleo-setup
+aztec-setup
+celo-setup
+*.memdump
