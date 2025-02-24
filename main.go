@@ -58,7 +58,7 @@ func main() {
 		return
 	}
 
-	resultFileName := fmt.Sprintf("kzg_srs_canonical_%d_bn254_%s.memdump", pointsNum-1, args[1])
+	resultFileName := fmt.Sprintf("kzg_srs_canonical_%d_%s_%s.memdump", pointsNum-1, args[2], args[1])
 
 	f, err := os.Create(resultFileName)
 	if err != nil {
