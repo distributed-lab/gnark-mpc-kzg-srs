@@ -49,6 +49,14 @@ go build -o gnark_mpc_srs
 
 ## Usage
 
+> [!IMPORTANT]
+> To generate the output file the `.WriteDump()` method is used. WriteDump writes the binary encoding of the entire SRS
+> memory representation It is meant to be use to achieve fast serialization/deserialization and is not compatible with
+> `.WriteTo()`/`.ReadFrom()`. It does not do any validation and doesn't encode points in a canonical form.
+>
+> In some cases you may want to use the `.WriteTo()` method instead, that require a single line of code change.
+
+
 ### Aztec bn254 KZG SRS
 
 The original Aztec setup ceremony can be found in the [AztecProtocol/ignition-verification](https://github.com/AztecProtocol/ignition-verification) repository. This repository also provides tools to verify that the setup was correctly generated and signed by all participants.
