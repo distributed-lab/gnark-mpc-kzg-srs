@@ -1,4 +1,4 @@
-# gnark-mpc-srs
+# gnark-mpc-kzg-srs
 
 - [Overview](#overview)
 - [Trusted Setup and Powers of Tau](#trusted-setup-and-powers-of-tau)
@@ -40,11 +40,11 @@ where $g$ is a generator of the elliptic curve group. This structured randomness
 
 ```sh
 # Clone the repository
-git clone https://github.com/distributed-lab/gnark_mpc_srs
-cd aztec-to-gnark-srs
+git clone https://github.com/distributed-lab/gnark_mpc_kzg_srs
+cd gnark_mpc_kzg_srs
 
 # Build the executable
-go build -o gnark_mpc_srs
+go build -o gnark_mpc_kzg_srs
 ```
 
 ## Usage
@@ -77,7 +77,7 @@ First of all you'll need to download the transcripts from the Aztec setup. You c
 Then:
 
 ```sh
-./gnark_mpc_srs aztec bn254 <transcripts_directory>
+./gnark_mpc_kzg_srs aztec bn254 <transcripts_directory>
 ```
 - `<transcripts_directory>`: The path to the directory containing **20 transcript files** from the Aztec setup.
 
@@ -138,7 +138,7 @@ downloaded using [this code](https://github.com/ProvableHQ/snarkVM/blob/82f1dbbf
 Then:
 
 ```sh
-./gnark_mpc_srs aleo bls12377 <setup_directory>
+./gnark_mpc_kzg_srs aleo bls12377 <setup_directory>
 ```
 - `<setup_directory>`: The path to the directory containing aleo setup files.
 
