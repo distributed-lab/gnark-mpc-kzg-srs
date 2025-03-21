@@ -162,13 +162,13 @@ File naming typically follows the pattern: `[round].[chunk_number].[contribution
 
 **Point distribution across chunks:**
 
-- Each chunk typically contains `1,048,576` (2²⁰) points
+- Each chunk typically contains `1,048,576` ($2^{20}$) points
 - The last chunk (255) contains `1,048,575` points
-- In total, the setup contains `268,435,455` (2²⁸ - 1) G1 points
+- In total, the setup contains `268,435,455` ($2^{28} - 1$) G1 points
 - Chunk `0` additionally contains special G2 points needed for verification
 
 > [!IMPORTANT]
-> An important detail: The number of G1 points is calculated as `2ⁿ - 1`, where `n` is the power parameter used in the setup.
+> An important detail: The number of G1 points is calculated as $2^{n}  - 1$, where `n` is the power parameter used in the setup.
 
 Usage:
 

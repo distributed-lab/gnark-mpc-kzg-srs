@@ -1,6 +1,7 @@
 package celo
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -16,19 +17,26 @@ import (
 )
 
 const (
-	// Size of the hash at the beginning of each file
+	// Hash size at the beginning of each file
 	HashSize = 64
 	// BW6-761 field element size in bytes
 	PointCoordinateSize = 96
 	// Size of a G1 point (x, y coordinates)
-	G1PointSize = PointCoordinateSize * 2
+	G1PointSize = bw6761.SizeOfG2AffineUncompressed
 	// Size of a G2 point (x, y coordinates) - same size as G1 for BW6-761
-	G2PointSize = PointCoordinateSize * 2
-	// Total chunks
+	G2PointSize = bw6761.SizeOfG2AffineUncompressed
+	// Total number of chunks (256) that divide the full SRS for manageable processing
+	// Each chunk typically contains 2^20 points, for a total of ~2^28 points across all chunks
 	TotalChunks = 256
 	// Halfway point - chunks 128-255 only have G1 points
+	// Chunks 0-127 contain G1 points
 	ChunkHalfwayPoint = 128
+	// Regex to extract the chunk number from filenames
+	// Expected format: [round].[chunk_number].[contribution_id].[contributor_address]
+	ChunkNumberRegexp = `\d+\.(\d+)\..*`
 )
+
+var fileRegexp = regexp.MustCompile(ChunkNumberRegexp)
 
 // TranslateBw6761SRS reads the Celo BW6-761 setup files and constructs a KZG SRS
 func TranslateBw6761SRS(setupDir string) (kzg.SRS, int, error) {
@@ -49,22 +57,22 @@ func TranslateBw6761SRS(setupDir string) (kzg.SRS, int, error) {
 	chunkFiles := make(map[int]string)
 
 	// Extract chunk numbers from filenames
-	re := regexp.MustCompile(`\d+\.(\d+)\..*`)
 	for _, file := range files {
-		matches := re.FindStringSubmatch(file.Name())
-		if len(matches) > 1 {
-			chunkNum, err := strconv.Atoi(matches[1])
-			if err != nil {
-				fmt.Printf("Warning: Couldn't parse chunk number from filename %s: %v\n", file.Name(), err)
-				continue
-			}
+		matches := fileRegexp.FindStringSubmatch(file.Name())
+		if len(matches) <= 1 {
+			continue
+		}
 
-			// If we have multiple files for the same chunk,
-			// we'll use the one that appears last alphabetically
-			// (which should be the latest contribution)
-			if existingFile, ok := chunkFiles[chunkNum]; !ok || strings.Compare(existingFile, file.Name()) < 0 {
-				chunkFiles[chunkNum] = file.Name()
-			}
+		chunkNum, err := strconv.Atoi(matches[1])
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to parse chunk number from filename %s: %w", file.Name(), err)
+		}
+
+		// If we have multiple files for the same chunk,
+		// we'll use the one that appears last alphabetically
+		// (which should be the latest contribution)
+		if existingFile, ok := chunkFiles[chunkNum]; !ok || strings.Compare(existingFile, file.Name()) < 0 {
+			chunkFiles[chunkNum] = file.Name()
 		}
 	}
 
@@ -76,8 +84,7 @@ func TranslateBw6761SRS(setupDir string) (kzg.SRS, int, error) {
 	for chunkNum := 0; chunkNum < TotalChunks; chunkNum++ {
 		fileName, ok := chunkFiles[chunkNum]
 		if !ok {
-			fmt.Printf("Warning: Missing chunk file for chunk %d\n", chunkNum)
-			continue
+			return nil, 0, fmt.Errorf("missing chunk file for chunk %d", chunkNum)
 		}
 
 		filePath := filepath.Join(setupDir, fileName)
@@ -85,8 +92,7 @@ func TranslateBw6761SRS(setupDir string) (kzg.SRS, int, error) {
 
 		invalidCount, err := processChunk(filePath, chunkNum, srs)
 		if err != nil {
-			fmt.Printf("Warning: Failed to process chunk %d: %v\n", chunkNum, err)
-			continue
+			fmt.Printf("failed to process chunk %d: %v\n", chunkNum, err)
 		}
 
 		invalidPointsCount += invalidCount
@@ -129,16 +135,22 @@ func processChunk(filePath string, chunkNum int, srs *bwKzg.SRS) (int, error) {
 
 	// Process G1 points
 	for i := 0; i < pointsToRead; i++ {
-		n, err := file.Read(buffer)
+		n, err := io.ReadFull(file, buffer)
 		if err != nil {
-			if err == io.EOF {
+			if err == io.EOF && i == 0 {
+				return 0, fmt.Errorf("unexpected EOF at beginning of file")
+			} else if err == io.EOF {
+				fmt.Printf("Warning: Reached EOF after reading %d points, expected %d\n", i, pointsToRead)
+				break
+			} else if err == io.ErrUnexpectedEOF {
+				fmt.Printf("Warning: Reached unexpected EOF after reading %d points, expected %d\n", i, pointsToRead)
 				break
 			}
 			return invalidPointsCount, fmt.Errorf("error reading file at point %d: %w", i, err)
 		}
 
 		if n < G1PointSize {
-			break
+			return invalidPointsCount, fmt.Errorf("incomplete read: got %d bytes, expected %d", n, G1PointSize)
 		}
 
 		pointsProcessed++
@@ -168,8 +180,6 @@ func processChunk(filePath string, chunkNum int, srs *bwKzg.SRS) (int, error) {
 
 	// If this is chunk 0, also process the G2 points
 	if chunkNum == 0 {
-		// We've already read tau_g1 points in the main loop
-
 		// File structure for chunk 0:
 		// [hash]
 		// [tau_g1 points]
@@ -178,17 +188,9 @@ func processChunk(filePath string, chunkNum int, srs *bwKzg.SRS) (int, error) {
 		// [beta_g1 points]
 		// [beta_g2 point]
 
-		// Calculate offsets
-		tauG1SectionSize := chunkSize * G1PointSize
-		tauG2SectionStart := int64(HashSize) + int64(tauG1SectionSize)
-
-		fmt.Printf("Chunk 0: tau_g1 section size: %d bytes, tau_g2 section starts at offset: %d\n",
-			tauG1SectionSize, tauG2SectionStart)
-
-		// Seek to the tau_g2 section
-		if _, err := file.Seek(tauG2SectionStart, io.SeekStart); err != nil {
-			return invalidPointsCount, fmt.Errorf("failed to seek to tau_g2 section: %w", err)
-		}
+		// At this point, we've already read all the tau_g1 points,
+		// so the file pointer should already be positioned at the beginning
+		// of the G2 points section.
 
 		// Read the generator (first G2 point)
 		g2GeneratorBuffer := make([]byte, G2PointSize)
@@ -214,7 +216,7 @@ func processChunk(filePath string, chunkNum int, srs *bwKzg.SRS) (int, error) {
 		// Verify this matches the expected G2 generator
 		_, _, _, expectedGen2 := bw6761.Generators()
 		if !g2Generator.Equal(&expectedGen2) {
-			fmt.Printf("Warning: G2 generator in file doesn't match expected generator\n")
+			return invalidPointsCount, errors.New("G2 generator in file doesn't match expected generator")
 		}
 
 		// Read tau*G2 (second G2 point - tau^1 * G2)
