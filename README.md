@@ -142,15 +142,47 @@ Then:
 ```
 - `<setup_directory>`: The path to the directory containing aleo setup files.
 
-### Celo bw6 KZG SRS
+### Celo BW6-761 KZG SRS
 
-TODO
+The original Celo BW6-761 trusted setup was generated using the [celo-org/snark-setup](https://github.com/celo-org/snark-setup) repository.
 
-## How It Works
-1. Reads **transcript files** containing metadata and elliptic curve points.
-2. Extracts **G1 and G2 points** required for the KZG SRS.
-3. Constructs a **gnark-compatible** KZG SRS.
-4. Writes the SRS to a file.
+The setup files are organized in a specific structure:
+
+- Files are split into 256 chunks (0-255) for manageability
+- Each chunk contains contributions from multiple participants
+- For each chunk, you should use the file of final contribution (as it contains the final state of the chunk)
+
+File naming typically follows the pattern: `[round].[chunk_number].[contribution_id].[contributor_address]`, where higher contribution IDs represent later contributions.
+
+**Each file contains:**
+
+- A 64-byte BLAKE2b hash at the beginning
+- For chunks 0-127: G1 points (tau powers) followed by G2, alpha_G1, and beta_G1 points
+- For chunks 128-255: Only G1 points (tau powers)
+
+**Point distribution across chunks:**
+
+- Each chunk typically contains `1,048,576` (2²⁰) points
+- The last chunk (255) contains `1,048,575` points
+- In total, the setup contains `268,435,455` (2²⁸ - 1) G1 points
+- Chunk `0` additionally contains special G2 points needed for verification
+
+> [!IMPORTANT]
+> An important detail: The number of G1 points is calculated as `2ⁿ - 1`, where `n` is the power parameter used in the setup.
+
+Usage:
+
+```sh
+./gnark_mpc_kzg_srs celo bw6761 <setup_directory>
+```
+- `<setup_directory>`: The path to the directory containing the Celo BW6-761 setup files.
+
+The tool automatically:
+
+1. Identifies the latest contribution for each chunk
+2. Extracts the G1 and G2 points in the correct order
+3. Constructs a gnark-compatible KZG SRS
+
 
 ## License
 This project is licensed under the MIT License.
