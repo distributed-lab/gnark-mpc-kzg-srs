@@ -158,7 +158,7 @@ File naming typically follows the pattern: `[round].[chunk_number].[contribution
 
 - A 64-byte BLAKE2b hash at the beginning
 - For chunks 0-127: G1 points (tau powers) followed by G2, alpha_G1, and beta_G1 points
-- For chunks 128-255: Only G1 points (tau powers)
+- For chunks 128-255: Only G1 points (tau powers) and beta_G2
 
 **Point distribution across chunks:**
 

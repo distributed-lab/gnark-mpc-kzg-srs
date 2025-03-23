@@ -28,8 +28,8 @@ const (
 	// Total number of chunks (256) that divide the full SRS for manageable processing
 	// Each chunk typically contains 2^20 points, for a total of ~2^28 points across all chunks
 	TotalChunks = 256
-	// Halfway point - chunks 128-255 only have G1 points
-	// Chunks 0-127 contain G1 points
+	// Halfway point - chunks 128-255 only have G1 points and beta_G2
+	// Chunks 0-127 contain G1, G2, alpha_G1, beta_G1, beta_G2
 	ChunkHalfwayPoint = 128
 	// Regex to extract the chunk number from filenames
 	// Expected format: [round].[chunk_number].[contribution_id].[contributor_address]
@@ -78,8 +78,6 @@ func TranslateBw6761SRS(setupDir string) (kzg.SRS, int, error) {
 
 	fmt.Printf("Found %d chunk files\n", len(chunkFiles))
 
-	var invalidPointsCount int
-
 	// Process chunks in order
 	for chunkNum := 0; chunkNum < TotalChunks; chunkNum++ {
 		fileName, ok := chunkFiles[chunkNum]
@@ -90,12 +88,11 @@ func TranslateBw6761SRS(setupDir string) (kzg.SRS, int, error) {
 		filePath := filepath.Join(setupDir, fileName)
 		fmt.Printf("Processing chunk %d from file %s\n", chunkNum, fileName)
 
-		invalidCount, err := processChunk(filePath, chunkNum, srs)
+		err := processChunk(filePath, chunkNum, srs)
 		if err != nil {
 			fmt.Printf("failed to process chunk %d: %v\n", chunkNum, err)
 		}
 
-		invalidPointsCount += invalidCount
 	}
 
 	// Precompute the lines when the G2 points are set
@@ -107,22 +104,22 @@ func TranslateBw6761SRS(setupDir string) (kzg.SRS, int, error) {
 	return srs, len(srs.Pk.G1), nil
 }
 
-func processChunk(filePath string, chunkNum int, srs *bwKzg.SRS) (int, error) {
+func processChunk(filePath string, chunkNum int, srs *bwKzg.SRS) error {
 	file, err := os.Open(filePath)
 	if err != nil {
-		return 0, fmt.Errorf("failed to open file: %w", err)
+		return fmt.Errorf("failed to open file: %w", err)
 	}
 	defer file.Close()
 
 	fileInfo, err := file.Stat()
 	if err != nil {
-		return 0, fmt.Errorf("failed to get file info: %w", err)
+		return fmt.Errorf("failed to get file info: %w", err)
 	}
 	fileSize := fileInfo.Size()
 
 	// Skip the hash at the beginning of the file
 	if _, err := file.Seek(int64(HashSize), io.SeekStart); err != nil {
-		return 0, fmt.Errorf("failed to seek past hash: %w", err)
+		return fmt.Errorf("failed to seek past hash: %w", err)
 	}
 
 	// Calculate chunk size
@@ -138,7 +135,7 @@ func processChunk(filePath string, chunkNum int, srs *bwKzg.SRS) (int, error) {
 		n, err := io.ReadFull(file, buffer)
 		if err != nil {
 			if err == io.EOF && i == 0 {
-				return 0, fmt.Errorf("unexpected EOF at beginning of file")
+				return fmt.Errorf("unexpected EOF at beginning of file")
 			} else if err == io.EOF {
 				fmt.Printf("Warning: Reached EOF after reading %d points, expected %d\n", i, pointsToRead)
 				break
@@ -146,32 +143,29 @@ func processChunk(filePath string, chunkNum int, srs *bwKzg.SRS) (int, error) {
 				fmt.Printf("Warning: Reached unexpected EOF after reading %d points, expected %d\n", i, pointsToRead)
 				break
 			}
-			return invalidPointsCount, fmt.Errorf("error reading file at point %d: %w", i, err)
+			return fmt.Errorf("error reading file at point %d: %w", i, err)
 		}
 
 		if n < G1PointSize {
-			return invalidPointsCount, fmt.Errorf("incomplete read: got %d bytes, expected %d", n, G1PointSize)
+			return fmt.Errorf("incomplete read: got %d bytes, expected %d", n, G1PointSize)
 		}
 
 		pointsProcessed++
 
 		x, err := extractBw6FieldElement(buffer[:PointCoordinateSize])
 		if err != nil {
-			invalidPointsCount++
-			continue
+			return fmt.Errorf("failed to extract x coordinate: %w", err)
 		}
 
 		y, err := extractBw6FieldElement(buffer[PointCoordinateSize:])
 		if err != nil {
-			invalidPointsCount++
-			continue
+			return fmt.Errorf("failed to extract y coordinate: %w", err)
 		}
 
 		point := bw6761.G1Affine{X: x, Y: y}
 
 		if point.IsInfinity() || !point.IsOnCurve() {
-			invalidPointsCount++
-			continue
+			return fmt.Errorf("point at index %d is not on curve or infinity", i)
 		}
 
 		srs.Pk.G1 = append(srs.Pk.G1, point)
@@ -195,49 +189,49 @@ func processChunk(filePath string, chunkNum int, srs *bwKzg.SRS) (int, error) {
 		// Read the generator (first G2 point)
 		g2GeneratorBuffer := make([]byte, G2PointSize)
 		if _, err := io.ReadFull(file, g2GeneratorBuffer); err != nil {
-			return invalidPointsCount, fmt.Errorf("failed to read G2 generator: %w", err)
+			return fmt.Errorf("failed to read G2 generator: %w", err)
 		}
 
 		g2GenX, err := extractBw6FieldElement(g2GeneratorBuffer[:PointCoordinateSize])
 		if err != nil {
-			return invalidPointsCount, fmt.Errorf("failed to parse G2 generator X coordinate: %w", err)
+			return fmt.Errorf("failed to parse G2 generator X coordinate: %w", err)
 		}
 
 		g2GenY, err := extractBw6FieldElement(g2GeneratorBuffer[PointCoordinateSize:])
 		if err != nil {
-			return invalidPointsCount, fmt.Errorf("failed to parse G2 generator Y coordinate: %w", err)
+			return fmt.Errorf("failed to parse G2 generator Y coordinate: %w", err)
 		}
 
 		g2Generator := bw6761.G2Affine{X: g2GenX, Y: g2GenY}
 		if !g2Generator.IsOnCurve() {
-			return invalidPointsCount, fmt.Errorf("G2 generator point is not on curve")
+			return fmt.Errorf("G2 generator point is not on curve")
 		}
 
 		// Verify this matches the expected G2 generator
 		_, _, _, expectedGen2 := bw6761.Generators()
 		if !g2Generator.Equal(&expectedGen2) {
-			return invalidPointsCount, errors.New("G2 generator in file doesn't match expected generator")
+			return errors.New("G2 generator in file doesn't match expected generator")
 		}
 
 		// Read tau*G2 (second G2 point - tau^1 * G2)
 		tauG2Buffer := make([]byte, G2PointSize)
 		if _, err := io.ReadFull(file, tauG2Buffer); err != nil {
-			return invalidPointsCount, fmt.Errorf("failed to read τG2: %w", err)
+			return fmt.Errorf("failed to read τG2: %w", err)
 		}
 
 		tauG2x, err := extractBw6FieldElement(tauG2Buffer[:PointCoordinateSize])
 		if err != nil {
-			return invalidPointsCount, fmt.Errorf("failed to parse τG2 X coordinate: %w", err)
+			return fmt.Errorf("failed to parse τG2 X coordinate: %w", err)
 		}
 
 		tauG2y, err := extractBw6FieldElement(tauG2Buffer[PointCoordinateSize:])
 		if err != nil {
-			return invalidPointsCount, fmt.Errorf("failed to parse τG2 Y coordinate: %w", err)
+			return fmt.Errorf("failed to parse τG2 Y coordinate: %w", err)
 		}
 
 		tauG2 := bw6761.G2Affine{X: tauG2x, Y: tauG2y}
 		if !tauG2.IsOnCurve() {
-			return invalidPointsCount, fmt.Errorf("tau*G2 point is not on curve")
+			return fmt.Errorf("tau*G2 point is not on curve")
 		}
 
 		// Store the tau*G2 point in the SRS verification key
@@ -248,7 +242,7 @@ func processChunk(filePath string, chunkNum int, srs *bwKzg.SRS) (int, error) {
 	fmt.Printf("Chunk %d: Processed %d points, added %d valid points, skipped %d invalid points\n",
 		chunkNum, pointsProcessed, pointsAdded, invalidPointsCount)
 
-	return invalidPointsCount, nil
+	return nil
 }
 
 func calculateChunkSize(chunkNum int, fileSize int64) int {
@@ -259,8 +253,10 @@ func calculateChunkSize(chunkNum int, fileSize int64) int {
 		// tau_g1 takes 1/4
 		return int(availableBytes / (4 * int64(G1PointSize)))
 	} else {
-		// Chunks >= ChunkHalfwayPoint only have tau_g1
-		return int((fileSize - int64(HashSize)) / int64(G1PointSize))
+		// Chunks >= ChunkHalfwayPoint have tau_g1 + separator (infinity) + beta_g2
+		// So subtract 2 points from the total count
+		totalPoints := int((fileSize - int64(HashSize)) / int64(G1PointSize))
+		return totalPoints - 2 // Subtract separator and beta_g2
 	}
 }
 
