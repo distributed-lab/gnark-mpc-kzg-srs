@@ -22,13 +22,13 @@ const (
 	// BW6-761 field element size in bytes
 	PointCoordinateSize = 96
 	// Size of a G1 point (x, y coordinates)
-	G1PointSize = bw6761.SizeOfG2AffineUncompressed
+	G1PointSize = bw6761.SizeOfG1AffineUncompressed
 	// Size of a G2 point (x, y coordinates) - same size as G1 for BW6-761
 	G2PointSize = bw6761.SizeOfG2AffineUncompressed
 	// Total number of chunks (256) that divide the full SRS for manageable processing
 	// Each chunk typically contains 2^20 points, for a total of ~2^28 points across all chunks
 	TotalChunks = 256
-	// Halfway point - chunks 128-255 only have G1 points and beta_G2
+	// Halfway point - chunks 128-255 only have G1 points and 1 beta_G2
 	// Chunks 0-127 contain G1, G2, alpha_G1, beta_G1, beta_G2
 	ChunkHalfwayPoint = 128
 	// Regex to extract the chunk number from filenames
@@ -124,7 +124,6 @@ func processChunk(filePath string, chunkNum int, srs *bwKzg.SRS) error {
 
 	// Calculate chunk size
 	chunkSize := calculateChunkSize(chunkNum, fileSize)
-	var invalidPointsCount int
 	buffer := make([]byte, G1PointSize)
 	pointsToRead := chunkSize
 	pointsProcessed := 0
@@ -239,8 +238,8 @@ func processChunk(filePath string, chunkNum int, srs *bwKzg.SRS) error {
 		fmt.Printf("Added τG2 from chunk 0\n")
 	}
 
-	fmt.Printf("Chunk %d: Processed %d points, added %d valid points, skipped %d invalid points\n",
-		chunkNum, pointsProcessed, pointsAdded, invalidPointsCount)
+	fmt.Printf("Chunk %d: Processed %d points, added %d valid points\n",
+		chunkNum, pointsProcessed, pointsAdded)
 
 	return nil
 }
@@ -253,10 +252,10 @@ func calculateChunkSize(chunkNum int, fileSize int64) int {
 		// tau_g1 takes 1/4
 		return int(availableBytes / (4 * int64(G1PointSize)))
 	} else {
-		// Chunks >= ChunkHalfwayPoint have tau_g1 + separator (infinity) + beta_g2
-		// So subtract 2 points from the total count
+		// Chunks >= ChunkHalfwayPoint have tau_g1 + beta_g2
+		// So subtract 1 beta_g2 point from the total count
 		totalPoints := int((fileSize - int64(HashSize)) / int64(G1PointSize))
-		return totalPoints - 2 // Subtract separator and beta_g2
+		return totalPoints - 1 // Subtract beta_g2
 	}
 }
 
