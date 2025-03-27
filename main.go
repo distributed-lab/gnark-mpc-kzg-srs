@@ -8,6 +8,7 @@ import (
 
 	"linea/aztec-srs-to-gnark/aleo"
 	"linea/aztec-srs-to-gnark/aztec"
+	"linea/aztec-srs-to-gnark/celo"
 )
 
 // ConstructSetup is a func to construct Gnark compatible KZG SRS
@@ -30,6 +31,7 @@ const (
 var supportedSetups = map[ProtocolName]map[CurveName]ConstructSetup{
 	AztecProtocol: {BN254Curve: aztec.TranslateBn254SRS},
 	AleoProtocol:  {BLS12377Curve: aleo.TranslateBls12377SRS},
+	CeloProtocol:  {BW6761Curve: celo.TranslateBw6761SRS},
 }
 
 func main() {
