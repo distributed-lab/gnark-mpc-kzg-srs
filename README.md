@@ -145,8 +145,9 @@ Then:
 ### Celo BW6-761 KZG SRS
 
 The original Celo BW6-761 trusted setup was generated using the [celo-org/snark-setup](https://github.com/celo-org/snark-setup) repository.
+The setup files can be found in the [public gcloud bucket](https://console.cloud.google.com/storage/browser/plumoceremonyphase1).
 
-The setup files are organized in a specific structure:
+Files are organized in a specific structure:
 
 - Files are split into 256 chunks (0-255) for manageability
 - Each chunk contains contributions from multiple participants
