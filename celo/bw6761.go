@@ -131,22 +131,9 @@ func processChunk(filePath string, chunkNum int, srs *bwKzg.SRS) error {
 
 	// Process G1 points
 	for i := 0; i < pointsToRead; i++ {
-		n, err := io.ReadFull(file, buffer)
+		_, err = io.ReadFull(file, buffer)
 		if err != nil {
-			if err == io.EOF && i == 0 {
-				return fmt.Errorf("unexpected EOF at beginning of file")
-			} else if err == io.EOF {
-				fmt.Printf("Warning: Reached EOF after reading %d points, expected %d\n", i, pointsToRead)
-				break
-			} else if err == io.ErrUnexpectedEOF {
-				fmt.Printf("Warning: Reached unexpected EOF after reading %d points, expected %d\n", i, pointsToRead)
-				break
-			}
 			return fmt.Errorf("error reading file at point %d: %w", i, err)
-		}
-
-		if n < G1PointSize {
-			return fmt.Errorf("incomplete read: got %d bytes, expected %d", n, G1PointSize)
 		}
 
 		pointsProcessed++
@@ -251,12 +238,11 @@ func calculateChunkSize(chunkNum int, fileSize int64) int {
 		availableBytes := fileSize - int64(HashSize)
 		// tau_g1 takes 1/4
 		return int(availableBytes / (4 * int64(G1PointSize)))
-	} else {
-		// Chunks >= ChunkHalfwayPoint have tau_g1 + beta_g2
-		// So subtract 1 beta_g2 point from the total count
-		totalPoints := int((fileSize - int64(HashSize)) / int64(G1PointSize))
-		return totalPoints - 1 // Subtract beta_g2
 	}
+	// Chunks >= ChunkHalfwayPoint have tau_g1 + beta_g2
+	// So subtract 1 beta_g2 point from the total count
+	totalPoints := int((fileSize - int64(HashSize)) / int64(G1PointSize))
+	return totalPoints - 1 // Subtract beta_g2
 }
 
 func extractBw6FieldElement(data []byte) (fp.Element, error) {
